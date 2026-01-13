@@ -922,7 +922,14 @@ def print_custum(emotion, dial, ref, hyp_g, pred_emotions, comet_res):
     return res
 
 
-def evaluate(model, data, ty="valid", max_dec_step=30):
+def evaluate(
+    model,
+    data,
+    ty="valid",
+    max_dec_step=30,
+    return_texts=False,
+    calc_gen_metrics=False,
+):
     model.__id__logger = 0
     ref, hyp_g, results = [], [], []
     if ty == "test":
@@ -942,22 +949,23 @@ def evaluate(model, data, ty="valid", max_dec_step=30):
         p.append(ppl)
         bce.append(bce_prog)
         acc.append(acc_prog)
-        if config.save_decode:
-            if ty == "test":
+        if config.save_decode or calc_gen_metrics:
+            if ty == "test" or calc_gen_metrics:
                 sent_g = model.decoder_greedy(batch, max_dec_step=max_dec_step)
                 for i, greedy_sent in enumerate(sent_g):
                     rf = " ".join(batch["target_txt"][i])
                     hyp_g.append(greedy_sent)
                     ref.append(rf)
-                    temp = print_custum(
-                        emotion=batch["program_txt"][i],
-                        dial=[" ".join(s) for s in batch["input_txt"][i]],
-                        ref=rf,
-                        hyp_g=greedy_sent,
-                        pred_emotions=top_preds,
-                        comet_res=comet_res,
-                    )
-                    results.append(temp)
+                    if config.save_decode and ty == "test":
+                        temp = print_custum(
+                            emotion=batch["program_txt"][i],
+                            dial=[" ".join(s) for s in batch["input_txt"][i]],
+                            ref=rf,
+                            hyp_g=greedy_sent,
+                            pred_emotions=top_preds,
+                            comet_res=comet_res,
+                        )
+                        results.append(temp)
         pbar.set_description(
             "loss:{:.4f} ppl:{:.1f}".format(np.mean(l), math.exp(np.mean(l)))
         )
@@ -970,10 +978,28 @@ def evaluate(model, data, ty="valid", max_dec_step=30):
     print("EVAL\tLoss\tPPL\tAccuracy\n")
     print("{}\t{:.4f}\t{:.4f}\t{:.4f}\n".format(ty, loss, math.exp(loss), acc))
     
-    if ty == 'test':
-        dist_1, dist_2 = calc_distinct(hyp_g)
-        print("Dist-1\tDist-2")
-        print("{:.4f}\t{:.4f}\n".format(dist_1, dist_2))
+    dist_1 = dist_2 = avg_len = None
+    if calc_gen_metrics or ty == "test":
+        if hyp_g:
+            dist_1, dist_2 = calc_distinct(hyp_g)
+            avg_len = np.mean([len(s.split()) for s in hyp_g])
+        if ty == "test":
+            print("Dist-1\tDist-2")
+            print("{:.4f}\t{:.4f}\n".format(dist_1 or 0.0, dist_2 or 0.0))
+
+    if return_texts or calc_gen_metrics:
+        return (
+            loss,
+            math.exp(loss),
+            bce,
+            acc,
+            results,
+            dist_1,
+            dist_2,
+            avg_len,
+            ref,
+            hyp_g,
+        )
 
     return loss, math.exp(loss), bce, acc, results
 

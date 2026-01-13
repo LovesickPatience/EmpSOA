@@ -1,3 +1,5 @@
+from src.utils import config
+
 DATA_FILES = lambda data_dir: {
     "train": [
         f"{data_dir}/sys_dialog_texts.train.npy",
@@ -46,7 +48,7 @@ WORD_PAIRS = {
     "there're": "there are",
 }
 
-EMO_MAP = {
+ED_EMO_MAP = {
     "surprised": 0,
     "excited": 1,
     "annoyed": 2,
@@ -81,7 +83,7 @@ EMO_MAP = {
     "faithful": 31,
 }
 
-MAP_EMO = {
+ED_MAP_EMO = {
     0: "surprised",
     1: "excited",
     2: "annoyed",
@@ -115,3 +117,22 @@ MAP_EMO = {
     30: "apprehensive",
     31: "faithful",
 }
+
+MELD_LABELS = [
+    "neutral",
+    "joy",
+    "surprise",
+    "anger",
+    "sadness",
+    "disgust",
+    "fear",
+]
+MELD_EMO_MAP = {label: idx for idx, label in enumerate(MELD_LABELS)}
+MELD_MAP_EMO = {idx: label for label, idx in MELD_EMO_MAP.items()}
+
+if "MELD" in config.data_dir:
+    EMO_MAP = MELD_EMO_MAP
+    MAP_EMO = MELD_MAP_EMO
+else:
+    EMO_MAP = ED_EMO_MAP
+    MAP_EMO = ED_MAP_EMO

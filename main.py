@@ -92,6 +92,72 @@ def test(model, test_set):
             for r in results:
                 f.write(r)
 
+
+def eval_valid_metrics(model, dev_set):
+    model.eval()
+    print("VALIDATION METRICS ....")
+    (
+        loss_val,
+        ppl_val,
+        bce_val,
+        acc_val,
+        _,
+        dist1,
+        dist2,
+        avg_len,
+        refs,
+        hyps,
+    ) = evaluate(
+        model,
+        dev_set,
+        ty="valid",
+        max_dec_step=50,
+        return_texts=True,
+        calc_gen_metrics=True,
+    )
+    print(
+        "VALID: {:.4f}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.2f}".format(
+            loss_val,
+            ppl_val,
+            bce_val,
+            acc_val,
+            dist1 or 0.0,
+            dist2 or 0.0,
+            avg_len or 0.0,
+        )
+    )
+    bert_f1 = None
+    try:
+        from bert_score import score as bert_score
+    except ImportError:
+        print("BERTScore not available. Install bert-score to enable it.")
+    else:
+        _, _, f1 = bert_score(
+            hyps,
+            refs,
+            lang=config.bertscore_lang,
+            model_type=config.bertscore_model,
+            verbose=False,
+        )
+        bert_f1 = f1.mean().item()
+        print("BERTScore F1: {:.4f}".format(bert_f1))
+
+    file_summary = config.save_path + "/valid_metrics.txt"
+    with open(file_summary, "w") as f:
+        f.write("Loss\tPPL\tBCE\tAcc\tDist1\tDist2\tAvgLen\tBERTScoreF1\n")
+        f.write(
+            "{:.4f}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.2f}\t{}\n".format(
+                loss_val,
+                ppl_val,
+                bce_val,
+                acc_val,
+                dist1 or 0.0,
+                dist2 or 0.0,
+                avg_len or 0.0,
+                "" if bert_f1 is None else "{:.4f}".format(bert_f1),
+            )
+        )
+
 def main():
     set_seed()  # for reproducibility
 
@@ -107,6 +173,8 @@ def main():
         weights_best = train(model, train_set, dev_set)
         model.epoch = 1
         model.load_state_dict({name: weights_best[name] for name in weights_best})
+        if config.eval_valid_metrics:
+            eval_valid_metrics(model, dev_set)
         test(model, test_set)
 
 

@@ -74,6 +74,13 @@ parser.add_argument("--save", action="store_true")
 parser.add_argument("--save_decode", action="store_true")
 
 parser.add_argument("--emb_file", type=str)
+parser.add_argument("--eval_valid_metrics", action="store_true")
+parser.add_argument(
+    "--bertscore_model",
+    type=str,
+    default="/root/autodp-tmp/ERGM-main/tools/models/roberta-large",
+)
+parser.add_argument("--bertscore_lang", type=str, default="en")
 
 ## transformer
 parser.add_argument("--hop", type=int, default=1)
@@ -150,6 +157,9 @@ fp16_opt_level = args.fp16_opt_level
 csk_feature = args.csk_feature
 save = args.save
 save_decode = args.save_decode
+eval_valid_metrics = args.eval_valid_metrics
+bertscore_model = args.bertscore_model
+bertscore_lang = args.bertscore_lang
 
 ### transformer
 hop = args.hop

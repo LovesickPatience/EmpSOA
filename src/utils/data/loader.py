@@ -132,16 +132,94 @@ def read_files(vocab):
     return data_train, data_dev, data_test, vocab
 
 
+def encode_meld(vocab, file_path):
+    from src.utils.comet import Comet
+
+    with open(file_path, "r") as f:
+        data_raw = json.load(f)
+
+    data = {
+        "context": [],
+        "target": [],
+        "emotion": [],
+        "situation": [],
+    }
+    for _, dialog in data_raw.items():
+        if not dialog:
+            continue
+        dialog_texts = [utt["text"] for utt in dialog]
+        dialog_emotions = [utt.get("emo", "neutral") for utt in dialog]
+        if not dialog_texts:
+            continue
+        data["target"].append(dialog_texts[-1])
+        data["context"].append(dialog_texts[:-1])
+        data["emotion"].append(dialog_emotions[-1])
+        data["situation"].append("")
+
+    data_dict = {
+        "context": [],
+        "target": [],
+        "emotion": [],
+        "situation": [],
+        "utt_cs": [],
+    }
+    comet = Comet(
+        "./comet-atomic-2020/models/comet_atomic2020_bart/comet-atomic_2020_BART",
+        config.device,
+    )
+    for i, k in enumerate(data_dict.keys()):
+        items = data[k]
+        if k == "context":
+            encode_ctx(vocab, items, data_dict, comet)
+        elif k == "emotion":
+            data_dict[k] = items
+        else:
+            for item in tqdm(items):
+                item = process_sent(item)
+                data_dict[k].append(item)
+                vocab.index_words(item)
+        if i == 3:
+            break
+    assert (
+        len(data_dict["context"])
+        == len(data_dict["target"])
+        == len(data_dict["emotion"])
+        == len(data_dict["situation"])
+        == len(data_dict["utt_cs"])
+    )
+
+    return data_dict
+
+
+def read_meld_files(vocab):
+    train_files = os.path.join(config.data_dir, "meld_diadict.json")
+    dev_files = os.path.join(config.data_dir, "meld_diadict_val.json")
+    test_files = dev_files
+
+    data_train = encode_meld(vocab, train_files)
+    data_dev = encode_meld(vocab, dev_files)
+    data_test = encode_meld(vocab, test_files)
+
+    return data_train, data_dev, data_test, vocab
+
+
 def load_dataset():
     data_dir = config.data_dir
-    cache_file = f"{data_dir}/dataset_preproc_new.p"
+    cache_name = "dataset_preproc_new.p"
+    if "MELD" in data_dir:
+        cache_name = "meld_" + cache_name
+    cache_file = f"{data_dir}/{cache_name}"
     if os.path.exists(cache_file):
         print("LOADING empathetic_dialogue")
         with open(cache_file, "rb") as f:
             [data_tra, data_val, data_tst, vocab] = pickle.load(f)
     else:
         print("Building dataset...")
-        data_tra, data_val, data_tst, vocab = read_files(
+        if "MELD" in data_dir:
+            read_fn = read_meld_files
+        else:
+            read_fn = read_files
+        data_tra, data_val, data_tst, vocab = read_fn(
             vocab=Lang(
                 {
                     config.UNK_idx: "UNK",
@@ -166,10 +244,20 @@ def load_dataset():
         print(" ")
     
     if config.csk_feature:
-        csk_tra, csk_val, csk_tst = pickle.load(open('data/ED/csk_features.pkl', 'rb'), encoding='latin1')
-        data_tra["csk_feature"] = csk_tra
-        data_val["csk_feature"] = csk_val
-        data_tst["csk_feature"] = csk_tst
+        csk_path = os.path.join(data_dir, "csk_features.pkl")
+        if os.path.exists(csk_path):
+            csk_tra, csk_val, csk_tst = pickle.load(
+                open(csk_path, "rb"), encoding="latin1"
+            )
+            data_tra["csk_feature"] = csk_tra
+            data_val["csk_feature"] = csk_val
+            data_tst["csk_feature"] = csk_tst
+        else:
+            logging.warning(
+                "csk_features.pkl not found at %s; falling back to decoded commonsense.",
+                csk_path,
+            )
+            config.csk_feature = False
 
     return data_tra, data_val, data_tst, vocab
 

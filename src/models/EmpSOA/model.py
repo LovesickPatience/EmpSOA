@@ -564,7 +564,8 @@ class EmpSOA(nn.Module):
             filter_size=config.filter,
         )
 
-        self.emo_lin = nn.Linear(config.hidden_dim, decoder_number, bias=False)
+        self.emotion_head = nn.Linear(config.hidden_dim, decoder_number, bias=False)
+        self.emo_lin = self.emotion_head
         
         self.generator = Generator(config.hidden_dim, self.vocab_size)
         self.activation = nn.Softmax(dim=1)
@@ -785,11 +786,11 @@ class EmpSOA(nn.Module):
         
         if not config.wo_sod:
             if config.only_agent:
-                emo_logits = self.emo_lin(agent_emo_state + user_cls_embs)
+                emo_logits = self.emotion_head(agent_emo_state + user_cls_embs)
             else:
-                emo_logits = self.emo_lin(user_emo_state + user_cls_embs)
+                emo_logits = self.emotion_head(user_emo_state + user_cls_embs)
         else:
-            emo_logits = self.emo_lin(user_cls_embs)
+            emo_logits = self.emotion_head(user_cls_embs)
         # -----------------------------------------------------------
 
         # -----------------SOM-----------------
