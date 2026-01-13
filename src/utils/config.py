@@ -30,6 +30,7 @@ parser.add_argument("--lr", type=float, default=0.0001)
 parser.add_argument("--max_grad_norm", type=float, default=2.0)
 parser.add_argument("--beam_size", type=int, default=5)
 parser.add_argument("--seed", type=int, default=42)
+parser.add_argument("--epochs", type=int, default=10)
 parser.add_argument("--save_path", type=str, default="save/test")
 parser.add_argument("--model_path", type=str, default="save/test")
 parser.add_argument("--save_path_dataset", type=str, default="save/")
@@ -142,6 +143,7 @@ cov_loss_wt = 1.0
 lr_coverage = 0.15
 eps = 1e-12
 epochs = 10000
+epochs = args.epochs
 
 emb_file = args.emb_file or "Your path for glove embedding"
 pretrain_emb = args.pretrain_emb

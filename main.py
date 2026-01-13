@@ -8,7 +8,7 @@ from src.utils import config
 from src.utils.common import set_seed
 from src.models.EmpSOA.model import EmpSOA
 from src.utils.data.loader import prepare_data_seq
-from src.models.common import evaluate, count_parameters, make_infinite
+from src.models.common import evaluate, count_parameters
 
 def make_model(vocab, dec_num):
     is_eval = config.test
@@ -32,43 +32,45 @@ def make_model(vocab, dec_num):
 
 
 def train(model, train_set, dev_set):
-    check_iter = 2000
+    last_epoch = 0
     try:
         model.train()
         best_ppl = 1000
         patient = 0
         weights_best = deepcopy(model.state_dict())
-        data_iter = make_infinite(train_set)
-        for n_iter in tqdm(range(1000000)):
-            loss, ppl, bce, acc, _, _ = model.train_one_batch(
-                next(data_iter), n_iter
-            )
-
-            if (n_iter + 1) % check_iter == 0:
-                model.eval()
-                model.epoch = n_iter
-                loss_val, ppl_val, bce_val, acc_val, _ = evaluate(
-                    model, dev_set, ty="valid", max_dec_step=50
+        for epoch in range(config.epochs):
+            last_epoch = epoch
+            pbar = tqdm(enumerate(train_set), total=len(train_set))
+            for n_iter, batch in pbar:
+                loss, ppl, bce, acc, _, _ = model.train_one_batch(
+                    batch, n_iter
                 )
-            
-                model.train()
-                if n_iter < 12000:
-                    continue
-                if ppl_val <= best_ppl:
-                    best_ppl = ppl_val
-                    patient = 0
-                    if config.save:
-                        model.save_model(best_ppl, n_iter)
-                    weights_best = deepcopy(model.state_dict())
-                else:
-                    patient += 1
-                if patient > 2:
-                    break
+                pbar.set_description(
+                    "loss:{:.4f} ppl:{:.1f}".format(loss, ppl)
+                )
+
+            model.eval()
+            model.epoch = epoch
+            loss_val, ppl_val, bce_val, acc_val, _ = evaluate(
+                model, dev_set, ty="valid", max_dec_step=50
+            )
+            model.train()
+
+            if ppl_val <= best_ppl:
+                best_ppl = ppl_val
+                patient = 0
+                if config.save:
+                    model.save_model(best_ppl, epoch)
+                weights_best = deepcopy(model.state_dict())
+            else:
+                patient += 1
+            if patient > 2:
+                break
 
     except KeyboardInterrupt:
         print("-" * 89)
         print("Exiting from training early")
-        model.save_model(best_ppl, n_iter)
+        model.save_model(best_ppl, last_epoch)
         weights_best = deepcopy(model.state_dict())
 
     return weights_best
